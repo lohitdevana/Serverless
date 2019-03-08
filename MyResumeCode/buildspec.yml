@@ -1,0 +1,20 @@
+version: 0.1
+
+
+phases:
+  build:
+    commands:
+      - echo Entered the build phase...
+      - echo Build started on `date`
+
+artifacts:
+  files:
+    - mail.php*
+    - js/*
+    - fonts/*
+    - css/*
+    - LineaIcons/*
+    - index.html*
+    - img/*
+    - bootstrap/*
+    - buildspec.yml*
