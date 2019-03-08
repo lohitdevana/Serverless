@@ -9,12 +9,4 @@ phases:
 
 artifacts:
   files:
-    - mail.php*
-    - js/*
-    - fonts/*
-    - css/*
-    - LineaIcons/*
-    - index.html*
-    - img/*
-    - bootstrap/*
-    - buildspec.yml*
+    - MyResumeCode
