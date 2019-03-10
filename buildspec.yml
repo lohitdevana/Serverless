@@ -10,9 +10,7 @@ phases:
 artifacts:
   files:
     - LineaIcons/*
-    - README.md
     - bootstrap/*
-    - buildspec.yml
     - css/*
     - fonts/*
     - img/*
