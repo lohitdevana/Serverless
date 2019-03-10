@@ -12,10 +12,11 @@ artifacts:
     - LineaIcons/*
     - README.md
     - bootstrap/*
-    - buildspec.yml 
+    - buildspec.yml
     - css/*
     - fonts/*
     - img/*
     - index.html
     - js/*
     - mail.php
+    -lambda.py
