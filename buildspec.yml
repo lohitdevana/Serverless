@@ -17,4 +17,3 @@ artifacts:
     - index.html
     - js/*
     - mail.php
-    -lambda.py
