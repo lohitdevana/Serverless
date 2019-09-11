@@ -10,9 +10,9 @@ pool:
   vmImage: 'ubuntu-latest'
 
 steps:
-- script: echo Hello, world!
+- script: touch new.txt
   displayName: 'Run a one-line script'
-  script: touch new.txt
+   
 
 - script: |
     echo Add other tasks to build, test, and deploy your project.
