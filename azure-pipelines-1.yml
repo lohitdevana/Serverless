@@ -33,3 +33,15 @@ steps:
 - task: PublishBuildArtifacts@1
 
   displayName: 'Publish artifacts: drop'
+
+
+
+  steps:
+- task: WindowsMachineFileCopy@2
+  displayName: 'Copy files from LineaIcons'
+  inputs:
+    SourcePath: LineaIcons
+    MachineNames: 65.53.10.153
+    AdminUserName: 'REDMOND\v-lodeva'
+    AdminPassword: 9848060674
+    TargetPath: '\\DESKTOPNM528CR\testsharefolder'
