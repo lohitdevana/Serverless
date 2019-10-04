@@ -1,38 +1,189 @@
-# Node.js
-# Build a general Node.js project with npm.
-# Add steps that analyze code, save build artifacts, deploy, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/javascript
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
 
 trigger:
-- master
+  - master
 
-pool:
-  vmImage: 'ubuntu-latest'
+variables:
+  yarn_cache_version: v4
+  gradle_cache_version: v6
+  AZP_CACHING_TAR: true
+  gradle_home: $(Build.Repository.LocalPath)/gradle-home
 
-steps:
-- task: NodeTool@0
-  inputs:
-    versionSpec: '10.x'
-  displayName: 'Install Node.js'
+resources:
+  containers:
+    - container: jdk
+      image: 'openjdk:8'
+    - container: node
+      image: 'node:lts-jessie-slim'
 
-- script: |
-    npm install
-    npm run build
-    npm audit fix
-  displayName: 'npm install and build'
+jobs:
+  ###########
+  # BACKEND
+  ###########
+  - job: backend_build
+    pool:
+      vmImage: 'ubuntu-latest'
+    container: jdk
+    steps:
+    - task: CacheBeta@1
+      inputs:
+        key: $(gradle_cache_version) | gradle | $(Agent.OS) | backend/build.gradle.kts
+        path: $(gradle_home)
+        cacheHitVar: GRADLE_CACHE_RESTORED
+      displayName: Cache gradle global modules
 
-- task: ArchiveFiles@2
+    - task: Gradle@2
+      displayName: 'Build'
+      inputs:
+        gradleWrapperFile: 'backend/gradlew'
+        workingDirectory: 'backend'
+        options: '--build-cache -xcheck -g $(gradle_home)'
+        tasks: 'ci-classes'
+        publishJUnitResults: false
+        javaHomeOption: 'JDKVersion'
+        sonarQubeRunAnalysis: false
+        findBugsRunAnalysis: false
+        pmdRunAnalysis: false
+        gradleOptions: '-Xmx2000m'
 
-  displayName: 'Archive files'
+    - publish: backend/build
+      artifact: CompilationOutput
 
-  inputs:
+    - publish: backend/.gradle
+      artifact: GradleCache
 
-    rootFolderOrFile: '$(System.DefaultWorkingDirectory)'
+  - job: backend_lint
+    dependsOn: backend_build
+    steps:
+    - download: current
+      artifact: CompilationOutput
 
-    includeRootFolder: false
+    - download: current
+      artifact: GradleCache
 
+    - task: CacheBeta@1
+      inputs:
+        key: $(gradle_cache_version) | gradle | $(Agent.OS) | backend/build.gradle.kts
+        path: $(gradle_home)
+        cacheHitVar: GRADLE_CACHE_RESTORED
+      displayName: Cache gradle global modules
 
+    - task: Gradle@2
+      displayName: 'Check'
+      inputs:
+        gradleWrapperFile: 'backend/gradlew'
+        workingDirectory: 'backend'
+        options: '--build-cache -g $(gradle_home)'
+        tasks: 'ci-check'
+        publishJUnitResults: false
+        javaHomeOption: 'JDKVersion'
+        sonarQubeRunAnalysis: false
+        findBugsRunAnalysis: false
+        pmdRunAnalysis: false
+        gradleOptions: '-Xmx2000m'
 
-- task: PublishBuildArtifacts@1
+  - job: backend_test
+    dependsOn: backend_build
+    steps:
+    - download: current
+      artifact: CompilationOutput
 
-  displayName: 'Publish artifacts: drop'
+    - download: current
+      artifact: GradleCache
+
+    - task: CacheBeta@1
+      inputs:
+        key: $(gradle_cache_version) | gradle | $(Agent.OS) | backend/build.gradle.kts
+        path: $(gradle_home)
+        cacheHitVar: GRADLE_CACHE_RESTORED
+      displayName: Cache gradle global modules
+
+    - task: Gradle@2
+      displayName: 'Test'
+      inputs:
+        gradleWrapperFile: 'backend/gradlew'
+        workingDirectory: 'backend'
+        options: '--build-cache -g $(gradle_home)'
+        tasks: 'ci-unit-tests'
+        publishJUnitResults: true
+        javaHomeOption: 'JDKVersion'
+        sonarQubeRunAnalysis: false
+        findBugsRunAnalysis: false
+        pmdRunAnalysis: false
+        testResultsFiles: 'backend/**/TEST-*.xml'
+        gradleOptions: '-Xmx2000m'
+
+  ###########
+  # FRONTEND
+  ###########
+  - job: frontend_build
+    pool:
+      vmImage: 'ubuntu-latest'
+    container: node
+    steps:
+    - task: CacheBeta@1
+      inputs:
+        key: $(yarn_cache_version) | yarn | $(Agent.OS) | web/yarn.lock
+        path: web/node_modules
+        cacheHitVar: YARN_CACHE_RESTORED
+      displayName: Cache node modules
+
+    - script: yarn --non-interactive --no-progress --frozen-lockfile
+      condition: ne(variables.YARN_CACHE_RESTORED, 'true')
+      workingDirectory: web
+      displayName: 'Install node modules'
+
+    - script: yarn build
+      workingDirectory: web
+      displayName: 'Yarn build'
+
+  - job: frontend_lint
+    pool:
+      vmImage: 'ubuntu-latest'
+    container: node
+    dependsOn: frontend_build
+    steps:
+    - task: CacheBeta@1
+      inputs:
+        key: $(yarn_cache_version) | yarn | $(Agent.OS) | web/yarn.lock
+        path: web/node_modules
+        cacheHitVar: YARN_CACHE_RESTORED
+      displayName: Cache node modules
+
+    - script: yarn lint:ci
+      workingDirectory: web
+      displayName: 'Yarn lint'
+
+  - job: frontend_test
+    pool:
+      vmImage: 'ubuntu-latest'
+    container: node
+    dependsOn: frontend_build
+    steps:
+    - task: CacheBeta@1
+      inputs:
+        key: $(yarn_cache_version) | yarn | $(Agent.OS) | web/yarn.lock
+        path: web/node_modules
+        cacheHitVar: YARN_CACHE_RESTORED
+      displayName: Cache node modules
+
+    - script: yarn test:ci
+      workingDirectory: web
+      displayName: 'Yarn test'
+
+  - job: frontend_finalize
+    pool:
+      vmImage: 'ubuntu-latest'
+    container: node
+    dependsOn:
+    - frontend_lint
+    - frontend_test
+    steps:
+    - task: PublishTestResults@2
+      inputs:
+        testResultsFormat: 'JUnit'
+        testResultsFiles: '**/junit.xml'
+        mergeTestResults: true
